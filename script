@@ -30583,36 +30583,58 @@ end)
 -- SUGGESTION SYSTEM
 -- =========================
 
+local function similarity(a,b)
+    local matches = 0
+    for i = 1, math.min(#a,#b) do
+        if a:sub(i,i) == b:sub(i,i) then
+            matches += 1
+        end
+    end
+    return matches / math.max(#a,#b)
+end
+
 local function getThreeSuggestions(text)
     text = text:lower():gsub("[^a-z]", "")
     if #text == 0 then return {} end
 
-    local priority = {}
-    local normal = {}
+    local scored = {}
 
     for _, word in ipairs(WORD_LIST) do
+        local score = 0
+
+        -- 1️⃣ Prefix match (kuat)
         if word:sub(1,#text) == text then
-            if word:sub(-1) == "x" or word:sub(-1) == "f" then
-                table.insert(priority, word)
-            else
-                table.insert(normal, word)
-            end
+            score = score + 5
+        end
+
+        -- 2️⃣ Substring match
+        if string.find(word, text, 1, true) then
+            score = score + 3
+        end
+
+        -- 3️⃣ Similarity match
+        local sim = similarity(word, text)
+        if sim >= 0.6 then
+            score = score + (sim * 4)
+        end
+
+        -- 4️⃣ Bonus akhir huruf x / f
+        if word:sub(-1) == "x" or word:sub(-1) == "f" then
+            score = score + 1
+        end
+
+        if score > 0 then
+            table.insert(scored, {word = word, score = score})
         end
     end
 
-    local pool = (#priority > 0) and priority or normal
+    table.sort(scored, function(a,b)
+        return a.score > b.score
+    end)
 
     local results = {}
-    local used = {}
-
-    for i = 1, #pool do
-        local randomIndex = math.random(1,#pool)
-        local candidate = pool[randomIndex]
-        if not used[candidate] then
-            table.insert(results, candidate)
-            used[candidate] = true
-        end
-        if #results >= 3 then break end
+    for i = 1, math.min(3,#scored) do
+        table.insert(results, scored[i].word)
     end
 
     return results
