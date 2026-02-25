@@ -30406,6 +30406,10 @@ aortik aoristis aorist ikannya makanya
 -- =========================
 -- CLEAN WORDS (ANTI DUPLIKAT)
 -- =========================
+local PREFIX_ROTATION = {}
+local WORD_COOLDOWN = {}
+local GLOBAL_TICK = 0
+local COOLDOWN_DURATION = 5 -- berapa kali input sebelum bisa muncul lagi
 
 local function cleanWords(raw)
     raw = raw:lower()
@@ -30597,49 +30601,67 @@ local function getThreeSuggestions(text)
     text = text:lower():gsub("[^a-z]", "")
     if #text == 0 then return {} end
 
-    local scored = {}
+    GLOBAL_TICK += 1
 
+    local available = {}
+    local fallback = {}
+
+    -- =========================
+    -- KUMPULKAN PREFIX MATCH
+    -- =========================
     for _, word in ipairs(WORD_LIST) do
-        local score = 0
+        if word:sub(1, #text) == text then
 
-        -- 1️⃣ Prefix match (kuat)
-        if word:sub(1,#text) == text then
-            score = score + 5
-        end
+            if not WORD_COOLDOWN[word] or WORD_COOLDOWN[word] <= GLOBAL_TICK then
+                table.insert(available, word)
+            else
+                table.insert(fallback, word)
+            end
 
-        -- 2️⃣ Substring match
-        if string.find(word, text, 1, true) then
-            score = score + 3
-        end
-
-        -- 3️⃣ Similarity match
-        local sim = similarity(word, text)
-        if sim >= 0.6 then
-            score = score + (sim * 4)
-        end
-
-        -- 4️⃣ Bonus akhir huruf x / f
-        if word:sub(-1) == "x" or word:sub(-1) == "f" then
-            score = score + 1
-        end
-
-        if score > 0 then
-            table.insert(scored, {word = word, score = score})
         end
     end
 
-    table.sort(scored, function(a,b)
-        return a.score > b.score
+    -- =========================
+    -- JIKA SEMUA COOLDOWN
+    -- =========================
+    if #available == 0 and #fallback > 0 then
+        -- pakai yang cooldown paling cepat selesai
+        table.sort(fallback, function(a,b)
+            return WORD_COOLDOWN[a] < WORD_COOLDOWN[b]
+        end)
+
+        available = fallback
+    end
+
+    -- =========================
+    -- PRIORITAS X/F
+    -- =========================
+    table.sort(available, function(a,b)
+        local ax = (a:sub(-1) == "x" or a:sub(-1) == "f") and 1 or 0
+        local bx = (b:sub(-1) == "x" or b:sub(-1) == "f") and 1 or 0
+
+        if ax ~= bx then
+            return ax > bx
+        end
+
+        return #a < #b
     end)
 
+    -- =========================
+    -- AMBIL MAX 3 SAJA
+    -- =========================
     local results = {}
-    for i = 1, math.min(3,#scored) do
-        table.insert(results, scored[i].word)
+
+    for i = 1, math.min(3, #available) do
+        local chosen = available[i]
+        table.insert(results, chosen)
+
+        -- masukkan ke cooldown
+        WORD_COOLDOWN[chosen] = GLOBAL_TICK + COOLDOWN_DURATION
     end
 
     return results
 end
-
 -- =========================
 -- EVENTS
 -- =========================
@@ -30649,9 +30671,9 @@ Input:GetPropertyChangedSignal("Text"):Connect(function()
 
     local list = getThreeSuggestions(Input.Text)
 
-    Suggest1.Text = "<font size='22'>1</font> : "..(list[1] or "-")
-    Suggest2.Text = "<font size='22'>2</font> : "..(list[2] or "-")
-    Suggest3.Text = "<font size='22'>3</font> : "..(list[3] or "-")
+   Suggest1.Text = "<font size='22'>1</font> : "..(list[1] or "-")
+Suggest2.Text = "<font size='22'>2</font> : "..(list[2] or "-")
+Suggest3.Text = "<font size='22'>3</font> : "..(list[3] or "-")
 end)
 
 UIS.InputBegan:Connect(function(input,gp)
