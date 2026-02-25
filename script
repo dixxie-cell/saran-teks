@@ -30497,6 +30497,7 @@ local function getSuggestion(inputText)
     return chosenPool[randomIndex]
 end
 
+
 -- =========================
 -- UI (COMPACT VERSION)
 -- =========================
