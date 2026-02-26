@@ -21,6 +21,7 @@ local MAX_SUFFIX = 6
 local RAW_WORDS = [[
 ab
 axis
+apterix
 axecelsum
 aba
 aba-aba
